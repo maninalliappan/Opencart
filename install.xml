@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<modification>
+	<name>Brand By Filter</name>
+	<id>Brand By Filter</id>
+	<code>OCMP_BBF</code>
+	<version>3.0.2</version>
+	<vqmver required="true">2.4.0</vqmver>
+	<author>ManiNalliapppan</author>
+
+
+	<file path="catalog/controller/product/category.php">
+
+		<operation>
+            <search><![CDATA[$results = $this->model_catalog_category->getCategories($category_id);]]></search>
+            <add position="after"><![CDATA[// get manufacturers for child categories
+			$categoryids_with_childs = array();
+			$categoryids_with_childs = $this->model_catalog_category->getCategoriesByParentId($category_id);
+			
+			array_push($categoryids_with_childs, $category_id);
+			$manufacturers = $this->model_catalog_manufacturer->getManufacturersByCategories($categoryids_with_childs);
+			
+			$data['manufacturer_filters'] = array();
+
+$data['manufacturer_filters'][] = array(
+				'text'  => $this->language->get('Всички'),
+				'value' => '0',
+				'href'  => $this->url->link('product/category', 'path=' . $this->request->get['path'] . $url . '&manufacturer_filter=0')
+			);
+		
+			if(is_array($manufacturers) && count($manufacturers) > 0){
+				foreach ($manufacturers as $man){
+					$data['manufacturer_filters'][] = array(
+						'text'  => $man['name'] ,
+						'value' => $man['manufacturer_id'],
+						'href'  => $this->url->link('product/category', 'path=' . $this->request->get['path'] . $url . '&manufacturer_filter=' . $man['manufacturer_id'])
+					);			
+				}
+	
+		
+			
+			}
+			]]></add>
+        </operation>
+		
+				<operation>
+            <search ><![CDATA[$this->load->model('catalog/product');]]></search>
+            <add position="after"><![CDATA[$this->load->model('catalog/manufacturer');
+			]]></add>
+        </operation>	
+	  <operation>
+            <search ><![CDATA['order'              => $order,]]></search>
+            <add position="after"><![CDATA[	'brandf'=>$brandf,	]]></add>
+        </operation>
+	  <operation>
+            <search ><![CDATA[	$data['limit'] = $limit;]]></search>
+            <add position="after"><![CDATA[		$data['brandf'] = $brandf;	]]></add>
+        </operation>
+	  <operation>
+            <search ><![CDATA[$this->load->model('tool/image');]]></search>
+            <add position="after"><![CDATA[if (isset($this->request->get['manufacturer_filter'])) {
+			$brandf = $this->request->get['manufacturer_filter'];
+		} 
+else
+{
+$brandf = '';
+}
+			 ]]></add>
+        </operation>
+		
+		
+		<operation>
+            <search ><![CDATA['sort'               => $sort,]]></search>
+            <add position="after"><![CDATA[	'manufacturer_filter' => $brandf,
+				'filter_manufacturer_id' => $brandf,
+			]]></add>
+        </operation>
+	  	
+	
+    </file>
+	
+	<file path="catalog/model/catalog/category.php">
+
+		<operation>
+            <search ><![CDATA[public function getCategoryFilters($category_id) {]]></search>
+            <add position="before"><![CDATA[public function getCategoriesByParentId($category_id) {
+		$category_data = array();
+
+		$category_query = $this->db->query("SELECT category_id FROM " . DB_PREFIX . "category WHERE parent_id = '" . (int)$category_id . "'");
+
+		foreach ($category_query->rows as $category) {
+			$category_data[] = $category['category_id'];
+
+			$children = $this->getCategoriesByParentId($category['category_id']);
+
+			if ($children) {
+				$category_data = array_merge($children, $category_data);
+			}			
+		}
+
+		return $category_data;
+	}]]></add>
+			</operation>
+
+	</file>
+	
+	<file path="catalog/model/catalog/manufacturer.php">
+
+		<operation>
+            <search ><![CDATA[public function getManufacturers($data = array()) {]]></search>
+            <add position="before"><![CDATA[public function getManufacturersByCategories($category_ids) {
+		if (is_array($category_ids) && count($category_ids) > 0){
+			$category_ids = implode(",", $category_ids);
+			$query = $this->db->query("SELECT m.manufacturer_id, m.name, COUNT(p.product_id) AS products_total FROM " . DB_PREFIX . "product_to_category AS pc LEFT JOIN " . DB_PREFIX . "product AS p ON p.product_id = pc.product_id LEFT JOIN " . DB_PREFIX . "manufacturer AS m ON m.manufacturer_id = p.manufacturer_id WHERE pc.category_id IN (".$category_ids.") AND p.status = 1 AND p.quantity > 0 GROUP BY m.manufacturer_id ORDER BY m.name ASC");
+			return $query->rows;
+		}
+		return false;
+	}
+	]]></add>
+			</operation>
+
+	</file>
+	
+	<file path="catalog/language/bg/product/category.php">
+
+		<operation>
+            <search position="before"><![CDATA[$_['text_limit']        = 'Покажи';]]></search>
+            <add trim="true"><![CDATA[$_['text_mfilter']  = ' Производители';]]></add>
+        </operation>
+	
+    </file>
+</modification>
